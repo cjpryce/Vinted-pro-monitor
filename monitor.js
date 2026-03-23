@@ -9,11 +9,11 @@ const searches = [
 ];
 
 const client = axios.create({
-  timeout: 15000,
+  timeout: 20000,
   headers: {
     "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-    Accept: "application/json, text/plain, */*",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36",
+    Accept: "application/json",
     "Accept-Language": "en-GB,en;q=0.9",
     Referer: "https://www.vinted.co.uk/",
     Origin: "https://www.vinted.co.uk"
@@ -22,9 +22,12 @@ const client = axios.create({
 
 async function fetchItems(search) {
   try {
-    const url = `https://www.vinted.co.uk/api/v2/catalog/items?search_text=${encodeURIComponent(
-      search.query
-    )}&order=newest_first&per_page=50`;
+    const url =
+      `https://www.vinted.co.uk/api/v2/catalog/items` +
+      `?search_text=${encodeURIComponent(search.query)}` +
+      `&order=newest_first` +
+      `&per_page=50` +
+      `&page=1`;
 
     const res = await client.get(url);
 
@@ -32,14 +35,12 @@ async function fetchItems(search) {
 
     return res.data.catalog_items;
   } catch (err) {
-    console.log("Fetch retry...");
+    console.log("Fetch failed");
     return [];
   }
 }
 
 async function sendToDiscord(item, search, price) {
-  if (!search.webhook) return;
-
   try {
     await axios.post(search.webhook, {
       embeds: [
@@ -50,16 +51,19 @@ async function sendToDiscord(item, search, price) {
           image: {
             url: item.photos?.[0]?.url
           },
-          footer: {
-            text: search.name
-          }
+          fields: [
+            {
+              name: "Brand Monitor",
+              value: search.name
+            }
+          ]
         }
       ]
     });
 
-    console.log("Sent:", item.title);
+    console.log("Sent item:", item.title);
   } catch (err) {
-    console.log("Discord failed");
+    console.log("Discord error");
   }
 }
 
@@ -69,13 +73,13 @@ async function check(search) {
   const items = await fetchItems(search);
 
   if (!items.length) {
-    console.log("No items returned");
+    console.log("Empty response from Vinted");
     return;
   }
 
   console.log("Items found:", items.length);
 
-  for (const item of items.slice(0, 20)) {
+  for (const item of items) {
     if (!item?.id) continue;
     if (seen.has(item.id)) continue;
 
@@ -85,8 +89,6 @@ async function check(search) {
       Number(item.price?.amount) ||
       Number(item.total_item_price?.amount) ||
       0;
-
-    if (!price) continue;
 
     if (price <= search.maxPrice) {
       await sendToDiscord(item, search, price);
@@ -100,7 +102,7 @@ async function start() {
   while (true) {
     for (const search of searches) {
       await check(search);
-      await new Promise((r) => setTimeout(r, 3000));
+      await new Promise((r) => setTimeout(r, 5000));
     }
   }
 }
