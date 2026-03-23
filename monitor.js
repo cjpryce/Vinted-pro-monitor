@@ -108,8 +108,8 @@ url: `https://www.vinted.co.uk/items/${item.id}`,
 description:
 `💰 Price: £${item.price}\n` +
 `📦 Category: ${search.name}`,
-thumbnail: {
-url: item.photo?.url
+image: {
+url: item.photo && item.photo.url ? item.photo.url : null
 }
 }
 ]
@@ -125,6 +125,8 @@ headers: { "User-Agent": "Mozilla/5.0" }
 const items = res.data.items.slice(0, 4);
 
 for (const item of items) {
+
+  if (!item || !item.id || !item.url) continue;
 
 if (seen.has(item.id)) continue;
 seen.add(item.id);
