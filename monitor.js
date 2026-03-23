@@ -112,6 +112,7 @@ async function run() {
 
   while (true) {
     for (const search of searches) {
+      console.log("checking", search.name);
       await check(search);
 
       // jitter = anti-ban
