@@ -90,7 +90,7 @@ async function check(search) {
   const url = `https://www.vinted.co.uk/api/v2/catalog/items?search_text=${encodeURIComponent(search.query)}&order=newest_first&currency=GBP`;
 
   const data = await fetch(url);
-  if (!data?.items) return;
+  if (!data?.catalog_items) return;
 
   for (const item of (data.catalog_items || []).slice(0, 25)) {
     console.log("items found:", data.catalog_items?.length);
@@ -125,7 +125,3 @@ async function run() {
 }
 
 run();
-
-setInterval(async () => { 
-  await run ();
-}, 15000);
