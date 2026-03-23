@@ -1,7 +1,10 @@
 {
-  "name": "vinted-monitor",
+  "name": "vinted-pro-monitor",
   "version": "1.0.0",
   "main": "monitor.js",
+  "scripts": {
+    "start": "node monitor.js"
+  },
   "dependencies": {
     "axios": "^1.6.0"
   }
