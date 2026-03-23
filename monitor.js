@@ -125,4 +125,6 @@ async function run() {
 
 run();
 
-setInterval(() => {}, 1000);
+setInterval(async () => { 
+  await run ();
+}, 15000);
