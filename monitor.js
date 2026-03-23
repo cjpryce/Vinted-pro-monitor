@@ -92,12 +92,12 @@ async function check(search) {
   const data = await fetch(url);
   if (!data?.items) return;
 
-  for (const item of data.items.slice(0, 3)) {
+  for (const item of data.items.slice(0, 25)) {
     if (!item?.id || seen.has(item.id)) continue;
 
     seen.add(item.id);
 
-    const price = parseFloat(item.price?.amount || item.price);
+    const price = Number(item.price?.amount || item.price || 0);
     if (!price) continue;
 
     if (price <= search.maxPrice || isRare(item.title)) {
