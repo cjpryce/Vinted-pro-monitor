@@ -94,7 +94,7 @@ title.toLowerCase().includes(word)
 );
 }
 
-async function sendToDiscord(item, search) {
+async function sendToDiscord(item, search, price) {
 
 const steal = item.price <= search.maxPrice * 0.45;
 
@@ -106,7 +106,7 @@ embeds: [
 title: `${tag} — ${item.title}`,
 url: `https://www.vinted.co.uk/items/${item.id}`,
 description:
-`💰 Price: £${item.price}\n` +
+`💰 Price: £${price}\n` +
 `📦 Category: ${search.name}`,
 image: {
 url: item.photo && item.photo.url ? item.photo.url : null
@@ -126,13 +126,17 @@ const items = res.data.items.slice(0, 4);
 
 for (const item of items) {
 
-  if (!item || !item.id || !item.title || !item.price) continue;
+  if (!item || !item.id || !item.title) continue;
 
 if (seen.has(item.id)) continue;
 seen.add(item.id);
 
-if (item.price <= search.maxPrice || rareItem(item.title)) {
-await sendToDiscord(item, search);
+const price = parseFloat(item.price?.amount || item.price);
+
+if (!price) continue;
+
+if (price <= search.maxPrice || rareItem(item.title)) {
+await sendToDiscord(item, search, price);
 }
 
 }
