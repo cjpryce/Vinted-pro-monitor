@@ -96,6 +96,7 @@ async function check(search) {
     console.log("items found:", data.catalog_items?.length);
     if (!item?.id || seen.has(item.id)) continue;
 
+    if (seen.size > 500) seen.clear();
     seen.add(item.id);
 
     const price = Number(item.price?.amount || item.price || 0);
