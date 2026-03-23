@@ -122,7 +122,7 @@ const res = await axios.get(search.url, {
 headers: { "User-Agent": "Mozilla/5.0" }
 });
 
-const items = res.data.items.slice(0, 10);
+const items = res.data.items.slice(0, 4);
 
 for (const item of items) {
 
