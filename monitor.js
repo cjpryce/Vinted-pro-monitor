@@ -1,161 +1,125 @@
 const axios = require("axios");
+const https = require("https");
 
-const CHECK_INTERVAL = 90000; // fast but still safe
+// ===== CONFIG =====
+const DELAY_BETWEEN_SEARCHES = 8000; // 8 sec
+const DELAY_BETWEEN_CYCLES = 15000; // 15 sec
+const MAX_RETRIES = 2;
 
+// ===== SEARCHES =====
 const searches = [
-
-{
-name: "Nike Air Max 95",
-webhook: "https://discord.com/api/webhooks/1485433585090433116/XPF5SdTRxeRShY46RH9enr0u0W0brCwU7Rejj5C0W2DZ43czMBZ8iudSGDPL00It5p86",
-url: "https://www.vinted.co.uk/api/v2/catalog/items?search_text=air+max+95&order=newest_first&currency=GBP",
-maxPrice: 130
-},
-
-{
-name: "Nike",
-webhook: "https://discord.com/api/webhooks/1485428077327548538/TFeRDSpuDS7gnP5JWhE-svPIP7OOpLRemfb8Lczay--uFPWBbQaMb_6A19lyX1PCn4GW",
-url: "https://www.vinted.co.uk/api/v2/catalog/items?search_text=nike&order=newest_first&currency=GBP",
-maxPrice: 70
-},
-
-{
-name: "Stussy",
-webhook: "https://discord.com/api/webhooks/1485431524043260035/tn4-hRa1PvRDHoVWUUbxST1HFgrLPTu1gyKx-xTcv2w3i8rj2h01yC-b8zeSP_MbylUV",
-url: "https://www.vinted.co.uk/api/v2/catalog/items?search_text=stussy&order=newest_first&currency=GBP",
-maxPrice: 110
-},
-
-{
-name: "North Face",
-webhook: "https://discord.com/api/webhooks/1485431037898133564/v343u2iJ9iHd40AsfBSl2N96ER94EtK_HQIK92MosmsKAhyOZPojyTpdEIKizGlKm91e",
-url: "https://www.vinted.co.uk/api/v2/catalog/items?search_text=north+face&order=newest_first&currency=GBP",
-maxPrice: 140
-},
-
-{
-name: "Essentials",
-webhook: "https://discord.com/api/webhooks/1485431729878470698/v9WOL8Jd5n1n8Gvd5IqwtRLsa7-q-Zn3yVJlB1MHNrfHa-3bmtyZWgN5FJ-jtXe02-sN",
-url: "https://www.vinted.co.uk/api/v2/catalog/items?search_text=essentials&order=newest_first&currency=GBP",
-maxPrice: 140
-},
-
-{
-name: "Corteiz",
-webhook: "https://discord.com/api/webhooks/1485432248743235584/WVF1g9keUQ91Ttm3p3vx0eyzkbLDoTJk0_mgZHS8pvYKDJPFqbweUl4BzSgkNSUcXC6f",
-url: "https://www.vinted.co.uk/api/v2/catalog/items?search_text=corteiz&order=newest_first&currency=GBP",
-maxPrice: 170
-},
-
-{
-name: "Supreme",
-webhook: "https://discord.com/api/webhooks/1485432462162133153/Hf9YL9SLVqihBD2fm2pQa9yjgRTNUIsi5H7sik4VYQ_l_stuEtulihLAbfmfRXc6EKfK",
-url: "https://www.vinted.co.uk/api/v2/catalog/items?search_text=supreme&order=newest_first&currency=GBP",
-maxPrice: 170
-},
-
-{
-name: "Nike Trainers",
-webhook: "https://discord.com/api/webhooks/1485432769059225721/D6qqgoz9FYA1067jz8JAIJqeWtSzET6t7OyK5wwAM7Xy1xszTK2wM1sxWl5sP3kotUHg",
-url: "https://www.vinted.co.uk/api/v2/catalog/items?search_text=nike+trainers&order=newest_first&currency=GBP",
-maxPrice: 120
-},
-
-{
-name: "Asics Trainers",
-webhook: "https://discord.com/api/webhooks/1485432951012593674/YCpBVBt5mITGsWUJOcLnQInEoYyiM6DEzX4fZJxwnLbtItuq--3Xb4axwdTZsE0whXyS",
-url: "https://www.vinted.co.uk/api/v2/catalog/items?search_text=asics&order=newest_first&currency=GBP",
-maxPrice: 120
-},
-
-{
-name: "New Balance Trainers",
-webhook: "https://discord.com/api/webhooks/1485433137394880618/5ofwdRqcYRVBb75S0vUIfFq0c_H5jLKuU7_abvYt-cBG6hvA2SmAGY6SKqOGxTdsnDIx",
-url: "https://www.vinted.co.uk/api/v2/catalog/items?search_text=new+balance&order=newest_first&currency=GBP",
-maxPrice: 120
-}
-
+  {
+    name: "Nike",
+    webhook: process.env.WEBHOOK_NIKE,
+    query: "nike",
+    maxPrice: 70
+  },
+  {
+    name: "Stussy",
+    webhook: process.env.WEBHOOK_STUSSY,
+    query: "stussy",
+    maxPrice: 110
+  },
+  {
+    name: "Supreme",
+    webhook: process.env.WEBHOOK_SUPREME,
+    query: "supreme",
+    maxPrice: 170
+  }
 ];
 
-const rareKeywords = [
-"rare",
-"vintage",
-"y2k",
-"2000s",
-"og",
-"deadstock",
-"archive"
-];
+// ===== AXIOS CLIENT =====
+const client = axios.create({
+  httpsAgent: new https.Agent({ keepAlive: true }),
+  timeout: 8000,
+  headers: {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-GB,en;q=0.9",
+    "Referer": "https://www.vinted.co.uk/",
+    "Origin": "https://www.vinted.co.uk"
+  }
+});
 
+// ===== STATE =====
 let seen = new Set();
 
-function rareItem(title) {
-return rareKeywords.some(word =>
-title.toLowerCase().includes(word)
-);
+// ===== HELPERS =====
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+const rareWords = ["rare","vintage","y2k","og","archive"];
+
+function isRare(title) {
+  return rareWords.some(w => title.toLowerCase().includes(w));
 }
 
-async function sendToDiscord(item, search, price) {
-
-const steal = item.price <= search.maxPrice * 0.45;
-
-const tag = steal ? "🚨 BIG DEAL FOUND" : "New Listing";
-
-await axios.post(search.webhook, {
-embeds: [
-{
-title: `${tag} — ${item.title}`,
-url: `https://www.vinted.co.uk/items/${item.id}`,
-description:
-`💰 Price: £${price}\n` +
-`📦 Category: ${search.name}`,
-image: {
-url: item.photo && item.photo.url ? item.photo.url : null
-}
-}
-]
-});
+async function fetch(url) {
+  for (let i = 0; i < MAX_RETRIES; i++) {
+    try {
+      const res = await client.get(url);
+      return res.data;
+    } catch {
+      await sleep(500 + Math.random() * 1000);
+    }
+  }
+  return null;
 }
 
-async function checkSearch(search) {
+// ===== DISCORD =====
+async function send(item, search, price) {
+  if (!search.webhook) return;
 
-const res = await axios.get(search.url, {
-headers: { "User-Agent": "Mozilla/5.0" }
-});
+  const goodDeal = price <= search.maxPrice * 0.5;
 
-const items = res.data.items.slice(0, 4);
-
-for (const item of items) {
-
-  if (!item || !item.id || !item.title) continue;
-
-if (seen.has(item.id)) continue;
-seen.add(item.id);
-
-const price = parseFloat(item.price?.amount || item.price);
-
-if (!price) continue;
-
-if (price <= search.maxPrice || rareItem(item.title)) {
-await sendToDiscord(item, search, price);
+  try {
+    await axios.post(search.webhook, {
+      embeds: [{
+        title: `${goodDeal ? "🚨 DEAL" : "New"} — ${item.title}`,
+        url: `https://www.vinted.co.uk/items/${item.id}`,
+        description: `💰 £${price}`,
+        image: { url: item.photo?.url || null }
+      }]
+    });
+  } catch (err) {
+    console.log("Discord error");
+  }
 }
 
+// ===== CORE =====
+async function check(search) {
+  const url = `https://www.vinted.co.uk/api/v2/catalog/items?search_text=${encodeURIComponent(search.query)}&order=newest_first&currency=GBP`;
+
+  const data = await fetch(url);
+  if (!data?.items) return;
+
+  for (const item of data.items.slice(0, 3)) {
+    if (!item?.id || seen.has(item.id)) continue;
+
+    seen.add(item.id);
+
+    const price = parseFloat(item.price?.amount || item.price);
+    if (!price) continue;
+
+    if (price <= search.maxPrice || isRare(item.title)) {
+      await send(item, search, price);
+    }
+  }
 }
 
+// ===== LOOP =====
+async function run() {
+  console.log("Sniper started...");
+
+  while (true) {
+    for (const search of searches) {
+      await check(search);
+
+      // jitter = anti-ban
+      await sleep(DELAY_BETWEEN_SEARCHES + Math.random() * 4000);
+    }
+
+    await sleep(DELAY_BETWEEN_CYCLES);
+  }
 }
 
-async function runMonitor() {
-
-for (const search of searches) {
-
-await checkSearch(search);
-
-await new Promise(r =>
-setTimeout(r, Math.random() * 15000)
-);
-
-}
-
-}
-
-setInterval(runMonitor, CHECK_INTERVAL);
-runMonitor();
+run();
