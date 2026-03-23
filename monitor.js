@@ -122,4 +122,6 @@ async function run() {
   }
 }
 
-run();
+run () ;
+// keep container alive for Railway
+setinterval(()=> {},1000)；
