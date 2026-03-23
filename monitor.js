@@ -126,7 +126,7 @@ const items = res.data.items.slice(0, 4);
 
 for (const item of items) {
 
-  if (!item || !item.id || !item.url) continue;
+  if (!item || !item.id || !item.title || !item.price) continue;
 
 if (seen.has(item.id)) continue;
 seen.add(item.id);
