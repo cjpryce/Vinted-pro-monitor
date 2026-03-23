@@ -4,9 +4,9 @@ const seen = new Set();
 
 // Searches
 const searches = [
-  { name: "Nike", query: "nike", maxPrice: 70, webhook: process.env.WEBHOOK_NIKE },
-  { name: "Stussy", query: "stussy", maxPrice: 70, webhook: process.env.WEBHOOK_STUSSY },
-  { name: "Supreme", query: "supreme", maxPrice: 70, webhook: process.env.WEBHOOK_SUPREME }
+  { name: "Nike", query: "nike", maxPrice: 999, webhook: process.env.WEBHOOK_NIKE },
+  { name: "Stussy", query: "stussy", maxPrice: 999, webhook: process.env.WEBHOOK_STUSSY },
+  { name: "Supreme", query: "supreme", maxPrice: 999, webhook: process.env.WEBHOOK_SUPREME }
 ];
 
 // Axios client
