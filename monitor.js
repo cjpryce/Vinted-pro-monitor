@@ -92,7 +92,8 @@ async function check(search) {
   const data = await fetch(url);
   if (!data?.items) return;
 
-  for (const item of data.items.slice(0, 25)) {
+  for (const item of (data.catalog_items || []).slice(0, 25)) {
+    console.log("items found:", data.catalog_items?.length);
     if (!item?.id || seen.has(item.id)) continue;
 
     seen.add(item.id);
