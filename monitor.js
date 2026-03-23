@@ -1,6 +1,6 @@
 const axios = require("axios");
 
-const CHECK_INTERVAL = 45000; // fast but still safe
+const CHECK_INTERVAL = 90000; // fast but still safe
 
 const searches = [
 
