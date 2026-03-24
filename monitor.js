@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const seen = new Set();
-let cookie = null;
+let cookie = "";
 
 const searches = [
   { name: "Nike", query: "nike", maxPrice: 999, webhook: process.env.WEBHOOK_NIKE },
@@ -9,122 +9,98 @@ const searches = [
   { name: "Supreme", query: "supreme", maxPrice: 999, webhook: process.env.WEBHOOK_SUPREME }
 ];
 
-async function refreshSession() {
+const headers = {
+  "user-agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36",
+  "accept-language": "en-GB,en;q=0.9",
+  accept: "application/json, text/plain, */*"
+};
+
+async function getSession() {
   try {
     const res = await axios.get("https://www.vinted.co.uk/", {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36"
-      }
+      headers
     });
 
-    const setCookie = res.headers["set-cookie"];
-    if (setCookie) {
-      cookie = setCookie.map(c => c.split(";")[0]).join("; ");
-      console.log("Session refreshed");
+    const cookies = res.headers["set-cookie"];
+    if (cookies) {
+      cookie = cookies.map(c => c.split(";")[0]).join("; ");
+      console.log("New session created");
     }
   } catch {
-    console.log("Session refresh failed");
+    console.log("Session failed");
   }
 }
 
-async function fetchItems(search) {
+async function fetch(search) {
   try {
     const res = await axios.get(
-      "https://www.vinted.co.uk/api/v2/catalog/items",
+      `https://www.vinted.co.uk/api/v2/catalog/items?search_text=${search.query}&order=newest_first&per_page=50`,
       {
-        params: {
-          search_text: search.query,
-          order: "newest_first",
-          per_page: 50
-        },
         headers: {
-          Cookie: cookie,
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36",
-          Accept: "application/json",
-          Referer: "https://www.vinted.co.uk/",
-          "Accept-Language": "en-GB,en;q=0.9"
+          ...headers,
+          cookie
         },
-        timeout: 20000
+        timeout: 15000
       }
     );
 
-    if (!res.data || !res.data.catalog_items) return [];
-    return res.data.catalog_items;
+    return res.data?.catalog_items || [];
   } catch {
-    console.log("Blocked attempt — refreshing session");
-    await refreshSession();
+    console.log("Blocked or failed");
     return [];
   }
 }
 
-async function sendToDiscord(item, search, price) {
-  if (!search.webhook) return;
-
+async function send(item, search) {
   try {
     await axios.post(search.webhook, {
       embeds: [
         {
           title: item.title,
           url: `https://www.vinted.co.uk/items/${item.id}`,
-          description: `£${price}`,
-          image: {
-            url: item.photos?.[0]?.url
-          },
-          footer: {
-            text: search.name
-          }
+          description: `£${item.price.amount}`,
+          image: { url: item.photos?.[0]?.url }
         }
       ]
     });
 
-    console.log("Sent:", item.title);
+    console.log("Sent to Discord:", item.title);
   } catch {
-    console.log("Discord failed");
+    console.log("Webhook failed");
   }
 }
 
-async function check(search) {
-  console.log("Checking", search.name);
-
-  const items = await fetchItems(search);
-
-  if (!items.length) {
-    console.log("No items returned");
-    return;
-  }
-
-  console.log("Items found:", items.length);
-
-  for (const item of items.slice(0, 20)) {
-    if (!item?.id) continue;
-    if (seen.has(item.id)) continue;
-
-    seen.add(item.id);
-
-    const price =
-      Number(item.price?.amount) ||
-      Number(item.total_item_price?.amount) ||
-      0;
-
-    if (price <= search.maxPrice) {
-      await sendToDiscord(item, search, price);
-    }
-  }
-}
-
-async function start() {
-  console.log("Starting monitor...");
-
-  await refreshSession();
+async function monitor() {
+  await getSession();
 
   while (true) {
     for (const search of searches) {
-      await check(search);
-      await new Promise(r => setTimeout(r, 5000));
+      console.log("Checking", search.name);
+
+      const items = await fetch(search);
+
+      if (!items.length) {
+        console.log("No items returned");
+        await getSession();
+        continue;
+      }
+
+      for (const item of items.slice(0, 20)) {
+        if (seen.has(item.id)) continue;
+
+        seen.add(item.id);
+
+        const price = Number(item.price?.amount || 0);
+
+        if (price <= search.maxPrice) {
+          await send(item, search);
+        }
+      }
+
+      await new Promise(r => setTimeout(r, 8000));
     }
   }
 }
 
-start();
+monitor();
