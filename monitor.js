@@ -1,117 +1,86 @@
 import axios from "axios";
 
 const seen = new Set();
-let cookie = null;
-let lastSessionRefresh = 0;
-
-const SESSION_REFRESH_INTERVAL = 30 * 60 * 1000; // 30 minutes
-const REQUEST_DELAY = 15000; // 15 seconds (important for avoiding blocks)
 
 const searches = [
-  { name: "Nike", query: "nike", maxPrice: 70, webhook: process.env.WEBHOOK_NIKE },
-  { name: "Stussy", query: "stussy", maxPrice: 70, webhook: process.env.WEBHOOK_STUSSY },
-  { name: "Supreme", query: "supreme", maxPrice: 70, webhook: process.env.WEBHOOK_SUPREME }
+  { name: "Nike", query: "nike hoodie", maxPrice: 70, webhook: process.env.WEBHOOK_NIKE },
+  { name: "Stussy", query: "stussy hoodie", maxPrice: 70, webhook: process.env.WEBHOOK_STUSSY },
+  { name: "Supreme", query: "supreme hoodie", maxPrice: 70, webhook: process.env.WEBHOOK_SUPREME }
 ];
 
 const headers = {
-  "user-agent":
+  "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36",
-  "accept-language": "en-GB,en;q=0.9",
-  accept: "application/json, text/plain, */*"
+  Accept: "application/json, text/plain, */*",
+  "Accept-Language": "en-GB,en;q=0.9"
 };
-
-async function refreshSession() {
-  try {
-    const res = await axios.get("https://www.vinted.co.uk/", {
-      headers
-    });
-
-    const cookies = res.headers["set-cookie"];
-    if (cookies) {
-      cookie = cookies.map(c => c.split(";")[0]).join("; ");
-      lastSessionRefresh = Date.now();
-      console.log("Session refreshed");
-    }
-  } catch {
-    console.log("Session refresh failed");
-  }
-}
 
 async function fetchItems(search) {
   try {
-    if (!cookie || Date.now() - lastSessionRefresh > SESSION_REFRESH_INTERVAL) {
-      await refreshSession();
-    }
+    const url =
+      "https://www.vinted.co.uk/catalog?search_text=" +
+      encodeURIComponent(search.query);
 
-    const res = await axios.get(
-      "https://www.vinted.co.uk/api/v2/catalog/items",
-      {
-        params: {
-          search_text: search.query,
-          order: "newest_first",
-          per_page: 50
-        },
-        headers: {
-          ...headers,
-          cookie
-        },
-        timeout: 20000
-      }
-    );
+    const res = await axios.get(url, { headers });
 
-    if (!res.data || !res.data.catalog_items) {
-      console.log("No items returned (possible soft block)");
+    const match = res.data.match(/window.__INITIAL_STATE__ = (.*);/);
+
+    if (!match) {
+      console.log("Blocked by Vinted");
       return [];
     }
 
-    return res.data.catalog_items;
-  } catch (err) {
-    console.log("Fetch error (possible block)");
+    const data = JSON.parse(match[1]);
+
+    const items = data.catalog.items;
+
+    return items || [];
+  } catch {
+    console.log("Fetch failed");
     return [];
   }
 }
 
-async function sendToDiscord(item, search) {
-  if (!search.webhook) return;
-
+async function send(item, search) {
   try {
     await axios.post(search.webhook, {
       embeds: [
         {
           title: item.title,
           url: `https://www.vinted.co.uk/items/${item.id}`,
-          description: `£${item.price.amount}`,
-          image: { url: item.photos?.[0]?.url },
-          footer: { text: `Vinted Monitor • ${search.name}` }
+          description: `£${item.price}`,
+          image: { url: item.photo?.url }
         }
       ]
     });
 
     console.log("Sent:", item.title);
   } catch {
-    console.log("Discord send failed");
+    console.log("Discord failed");
   }
 }
 
 async function check(search) {
-  console.log("Checking:", search.name);
+  console.log("Checking", search.name);
 
   const items = await fetchItems(search);
 
-  if (!items.length) return;
+  if (!items.length) {
+    console.log("No items found");
+    return;
+  }
 
-  console.log("Items found:", items.length);
+  console.log("Items:", items.length);
 
   for (const item of items.slice(0, 20)) {
-    if (!item?.id) continue;
     if (seen.has(item.id)) continue;
 
     seen.add(item.id);
 
-    const price = Number(item.price?.amount || 0);
+    const price = Number(item.price || 0);
 
     if (price <= search.maxPrice) {
-      await sendToDiscord(item, search);
+      await send(item, search);
     }
   }
 }
@@ -119,12 +88,10 @@ async function check(search) {
 async function start() {
   console.log("Render Vinted Monitor Started");
 
-  await refreshSession();
-
   while (true) {
     for (const search of searches) {
       await check(search);
-      await new Promise(r => setTimeout(r, REQUEST_DELAY));
+      await new Promise(r => setTimeout(r, 20000));
     }
   }
 }
